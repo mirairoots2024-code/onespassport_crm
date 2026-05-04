@@ -1,0 +1,1302 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>One's Passport CRM</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+<style>
+:root {
+  --blue:#649abd; --mauve:#BEAEBB; --pink:#f5baba;
+  --grad:linear-gradient(135deg,#649abd,#BEAEBB 60%,#f5baba);
+  --text:#1a1a2e; --sub:#6b7280; --bg:#f8f7fa; --white:#fff;
+  --border:#e5e7eb; --red:#ef4444; --green:#3DAA77; --orange:#f59e0b;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--text);font-size:14px;}
+
+/* ── LOGIN ── */
+.login-screen{
+  display:flex;position:fixed;inset:0;
+  background:var(--grad);
+  align-items:center;justify-content:center;z-index:999;
+}
+.login-screen.hidden{display:none;}
+.login-box{
+  background:var(--white);border-radius:20px;padding:40px;
+  width:100%;max-width:380px;box-shadow:0 20px 60px rgba(0,0,0,.2);
+}
+.login-logo{font-size:18px;font-weight:900;background:var(--grad);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+  background-clip:text;margin-bottom:6px;}
+.login-sub{font-size:12px;color:var(--sub);margin-bottom:28px;}
+.login-label{font-size:12px;font-weight:600;color:var(--sub);display:block;margin-bottom:5px;}
+.login-input{
+  width:100%;padding:10px 12px;border:1px solid var(--border);
+  border-radius:9px;font-size:14px;font-family:inherit;outline:none;margin-bottom:14px;
+}
+.login-input:focus{border-color:var(--blue);}
+.login-btn{
+  width:100%;padding:12px;border:none;border-radius:9px;
+  background:var(--grad);color:#fff;font-size:14px;font-weight:700;
+  cursor:pointer;font-family:inherit;margin-top:4px;
+}
+.login-btn:hover{opacity:.88;}
+.login-err{font-size:12px;color:var(--red);margin-top:10px;text-align:center;min-height:18px;}
+.login-loading{font-size:12px;color:var(--sub);margin-top:10px;text-align:center;min-height:18px;}
+
+/* ── APP ── */
+.app{display:none;}
+.app.visible{display:flex;min-height:100vh;}
+
+/* ── SIDEBAR ── */
+.sidebar{width:220px;background:var(--text);color:#fff;display:flex;flex-direction:column;flex-shrink:0;position:sticky;top:0;height:100vh;}
+.sidebar-logo{padding:20px 18px 16px;border-bottom:1px solid rgba(255,255,255,0.08);}
+.sidebar-logo .brand{font-size:15px;font-weight:700;background:var(--grad);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
+.sidebar-logo small{display:block;font-size:11px;color:rgba(255,255,255,0.35);margin-top:2px;}
+.sidebar-nav{flex:1;padding:10px 0;overflow-y:auto;}
+.nav-section{font-size:10px;font-weight:700;color:rgba(255,255,255,0.25);padding:12px 18px 4px;letter-spacing:.08em;text-transform:uppercase;}
+.nav-item{display:flex;align-items:center;gap:9px;padding:9px 18px;cursor:pointer;font-size:13px;color:rgba(255,255,255,0.55);transition:all .15s;border-left:3px solid transparent;}
+.nav-item:hover{color:#fff;background:rgba(255,255,255,0.05);}
+.nav-item.active{color:#fff;border-left-color:var(--blue);background:rgba(100,154,189,0.15);}
+.nav-icon{font-size:15px;width:18px;text-align:center;}
+.sidebar-bottom{padding:14px 18px;border-top:1px solid rgba(255,255,255,0.08);}
+.user-info{font-size:11px;color:rgba(255,255,255,0.4);margin-bottom:8px;word-break:break-all;}
+.logout-btn{font-size:11px;color:rgba(255,255,255,0.4);background:none;border:1px solid rgba(255,255,255,0.15);border-radius:6px;padding:5px 10px;cursor:pointer;width:100%;font-family:inherit;}
+.logout-btn:hover{color:#fff;border-color:rgba(255,255,255,0.4);}
+
+/* ── MAIN ── */
+.main{flex:1;overflow:auto;}
+.topbar{background:var(--white);border-bottom:1px solid var(--border);padding:0 24px;height:52px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:10;}
+.page-title{font-size:15px;font-weight:700;}
+.topbar-right{display:flex;gap:8px;align-items:center;}
+
+/* ── BUTTONS ── */
+.btn{display:inline-flex;align-items:center;gap:5px;padding:7px 16px;border-radius:8px;border:none;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;transition:all .15s;}
+.btn-primary{background:var(--grad);color:#fff;}.btn-primary:hover{opacity:.88;}
+.btn-ghost{background:transparent;color:var(--sub);border:1px solid var(--border);}.btn-ghost:hover{background:var(--bg);}
+.btn-danger{background:#fee2e2;color:var(--red);}.btn-danger:hover{background:#fecaca;}
+.btn-sm{padding:4px 11px;font-size:12px;}
+
+.content{padding:20px 24px;}
+.page{display:none;}.page.active{display:block;}
+
+/* ── LOADING OVERLAY ── */
+.page-loading{
+  display:none;position:fixed;inset:0;background:rgba(255,255,255,.7);
+  align-items:center;justify-content:center;z-index:50;font-size:14px;color:var(--sub);
+  flex-direction:column;gap:10px;
+}
+.page-loading.visible{display:flex;}
+.spinner{width:32px;height:32px;border:3px solid var(--border);border-top-color:var(--blue);border-radius:50%;animation:spin .7s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+
+/* ── STATS ── */
+.stat-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:14px;margin-bottom:20px;}
+.stat-card{background:var(--white);border-radius:12px;padding:18px;border:1px solid var(--border);}
+.stat-label{font-size:11px;color:var(--sub);margin-bottom:6px;}
+.stat-val{font-size:26px;font-weight:900;}
+.stat-val.grad{background:var(--grad);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
+.stat-sub{font-size:11px;color:var(--sub);margin-top:3px;}
+
+/* ── PANELS ── */
+.section-row{display:grid;grid-template-columns:1.2fr 1fr;gap:16px;margin-bottom:20px;}
+.panel{background:var(--white);border-radius:12px;padding:18px;border:1px solid var(--border);}
+.panel-title{font-size:13px;font-weight:700;margin-bottom:14px;}
+.funnel-item{display:flex;align-items:center;gap:10px;padding:5px 0;}
+.funnel-label{width:130px;font-size:12px;flex-shrink:0;}
+.funnel-bar-wrap{flex:1;background:var(--bg);border-radius:4px;height:14px;overflow:hidden;}
+.funnel-bar{height:100%;border-radius:4px;transition:width .4s;}
+.funnel-count{width:28px;font-size:12px;font-weight:700;text-align:right;}
+
+/* ── ALERTS ── */
+.alert-item{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;border-radius:8px;background:#fef3c7;font-size:12px;cursor:pointer;margin-bottom:6px;}
+.alert-item.overdue{background:#fee2e2;}
+.alert-item:hover{opacity:.88;}
+
+/* ── TABLE ── */
+.table-card{background:var(--white);border-radius:12px;border:1px solid var(--border);overflow:hidden;}
+.table-toolbar{padding:14px 18px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border);flex-wrap:wrap;gap:8px;}
+.search-row{display:flex;gap:8px;flex-wrap:wrap;}
+.search-input{padding:6px 11px;border:1px solid var(--border);border-radius:8px;font-size:13px;font-family:inherit;outline:none;width:170px;}
+.search-input:focus{border-color:var(--blue);}
+.filter-select{padding:6px 11px;border:1px solid var(--border);border-radius:8px;font-size:13px;font-family:inherit;outline:none;cursor:pointer;background:var(--white);}
+table{width:100%;border-collapse:collapse;}
+th{text-align:left;padding:9px 14px;font-size:11px;font-weight:700;color:var(--sub);background:var(--bg);border-bottom:1px solid var(--border);white-space:nowrap;cursor:pointer;user-select:none;}
+th:hover{color:var(--text);}
+.sort-arrow{margin-left:3px;opacity:.4;}
+th.sorted .sort-arrow{opacity:1;color:var(--blue);}
+td{padding:10px 14px;border-bottom:1px solid var(--border);font-size:13px;vertical-align:middle;}
+tr:last-child td{border-bottom:none;}
+tr:hover td{background:#fafafa;cursor:pointer;}
+.badge{display:inline-block;padding:2px 9px;border-radius:100px;font-size:11px;font-weight:600;white-space:nowrap;}
+.source-badge{display:inline-block;padding:2px 7px;border-radius:4px;font-size:11px;background:rgba(100,154,189,.1);color:var(--blue);font-weight:600;}
+.num-badge{display:inline-block;background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:1px 6px;font-size:11px;font-weight:700;color:var(--sub);}
+.milestone-dots{display:flex;gap:4px;}
+.milestone-dot{width:8px;height:8px;border-radius:50%;background:var(--border);}
+.milestone-dot.done{background:var(--green);}
+
+/* ── KANBAN ── */
+.kanban{display:flex;gap:12px;overflow-x:auto;padding-bottom:12px;}
+.kanban-col{min-width:190px;flex-shrink:0;background:var(--bg);border-radius:12px;padding:10px;}
+.kanban-col-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;}
+.kanban-col-title{font-size:12px;font-weight:700;}
+.kanban-count{font-size:11px;background:rgba(0,0,0,.08);padding:2px 7px;border-radius:100px;font-weight:600;}
+.kanban-card{background:var(--white);border-radius:8px;padding:10px;border:1px solid var(--border);cursor:pointer;transition:box-shadow .15s;margin-bottom:7px;}
+.kanban-card:hover{box-shadow:0 4px 12px rgba(0,0,0,.1);}
+.kanban-card.stale{background:#fff0f3;border-color:#f5baba;}
+.kanban-card-num{font-size:10px;color:var(--sub);margin-bottom:2px;}
+.kanban-card-name{font-size:13px;font-weight:600;margin-bottom:3px;}
+.kanban-card-meta{font-size:11px;color:var(--sub);}
+.kanban-card-cs{font-size:11px;margin-top:4px;}
+.kanban-stale-badge{font-size:10px;color:#c0392b;font-weight:700;margin-top:4px;}
+
+/* ── COHORT TABLE ── */
+.cohort-wrap{overflow-x:auto;margin-bottom:20px;}
+.cohort-table{border-collapse:collapse;font-size:12px;white-space:nowrap;}
+.cohort-table th{padding:6px 10px;background:var(--bg);border:1px solid var(--border);font-weight:700;text-align:center;color:var(--sub);}
+.cohort-table td{padding:5px 10px;border:1px solid var(--border);text-align:center;}
+.cohort-table td.month-label{font-weight:700;text-align:left;background:var(--bg);}
+.cohort-table td.num{color:var(--blue);font-weight:700;}
+.cohort-table td.rate{color:var(--green);font-weight:600;}
+.cohort-table td.contracted{color:#f97316;font-weight:700;}
+.cohort-table td.crate{color:#8b5cf6;font-weight:600;}
+.cohort-table td.zero{color:#ccc;}
+.analysis-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;}
+.analysis-card{background:var(--white);border-radius:12px;padding:16px;border:1px solid var(--border);}
+.analysis-title{font-size:13px;font-weight:700;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border);}
+.analysis-row{display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--bg);font-size:13px;}
+.analysis-row:last-child{border-bottom:none;}
+.analysis-label{color:var(--sub);}
+.analysis-val{font-weight:700;color:var(--text);}
+.report-tabs{display:flex;gap:0;border-bottom:2px solid var(--border);margin-bottom:20px;}
+.report-tab{padding:8px 20px;font-size:13px;font-weight:600;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;color:var(--sub);}
+.report-tab.active{color:var(--blue);border-bottom-color:var(--blue);}
+.report-section{display:none;}.report-section.active{display:block;}
+
+/* ── MODAL ── */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;z-index:100;padding:16px;}
+.modal-overlay.hidden{display:none;}
+.modal{background:var(--white);border-radius:16px;width:100%;max-width:700px;max-height:92vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.25);}
+.modal-header{padding:18px 22px 14px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--white);z-index:2;}
+.modal-title{font-size:15px;font-weight:700;}
+.modal-close{background:none;border:none;font-size:19px;cursor:pointer;color:var(--sub);}
+.modal-body{padding:18px 22px;}
+.modal-footer{padding:14px 22px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:8px;position:sticky;bottom:0;background:var(--white);}
+
+/* ── FORM ── */
+.form-section{margin-bottom:20px;}
+.form-section-title{font-size:12px;font-weight:700;color:var(--sub);text-transform:uppercase;letter-spacing:.05em;padding-bottom:8px;border-bottom:1px solid var(--border);margin-bottom:12px;}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.form-group{display:flex;flex-direction:column;gap:4px;}
+.form-group.full{grid-column:1/-1;}
+label{font-size:11px;font-weight:600;color:var(--sub);}
+input,select,textarea{padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;font-family:inherit;outline:none;transition:border-color .15s;}
+input:focus,select:focus,textarea:focus{border-color:var(--blue);}
+textarea{resize:vertical;min-height:70px;}
+.checkbox-row{display:flex;align-items:center;gap:8px;padding:8px 10px;border:1px solid var(--border);border-radius:8px;cursor:pointer;}
+.checkbox-row input[type=checkbox]{width:16px;height:16px;accent-color:var(--green);cursor:pointer;flex-shrink:0;}
+.checkbox-row.checked{border-color:var(--green);background:rgba(61,170,119,.06);}
+
+/* ── CS SESSIONS ── */
+.cs-sessions{display:flex;flex-direction:column;gap:6px;}
+.cs-session{display:flex;align-items:center;gap:8px;padding:7px 10px;background:var(--bg);border-radius:8px;}
+.cs-session-num{width:52px;font-size:12px;font-weight:600;color:var(--sub);flex-shrink:0;}
+.cs-session input[type=date]{flex:1;border:1px solid var(--border);padding:5px 8px;}
+.cs-session input[type=text]{flex:2;border:1px solid var(--border);padding:5px 8px;}
+.cs-add-btn{font-size:12px;color:var(--blue);cursor:pointer;background:none;border:1px dashed var(--blue);border-radius:6px;padding:5px 12px;font-family:inherit;margin-top:4px;}
+.cs-add-btn:hover{background:rgba(100,154,189,.08);}
+.cs-remove{background:none;border:none;color:var(--sub);cursor:pointer;font-size:15px;padding:2px;}
+.cs-remove:hover{color:var(--red);}
+
+/* ── DETAIL ── */
+.detail-tabs{display:flex;gap:0;border-bottom:1px solid var(--border);margin-bottom:16px;}
+.detail-tab{padding:8px 16px;font-size:13px;font-weight:500;cursor:pointer;border-bottom:2px solid transparent;color:var(--sub);transition:all .15s;}
+.detail-tab.active{color:var(--blue);border-bottom-color:var(--blue);font-weight:700;}
+.detail-tab-content{display:none;}
+.detail-tab-content.active{display:block;}
+.detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;}
+.detail-item label{font-size:11px;color:var(--sub);display:block;margin-bottom:2px;}
+.detail-item span{font-size:13px;font-weight:500;}
+.detail-section-title{font-size:12px;font-weight:700;color:var(--sub);text-transform:uppercase;letter-spacing:.05em;margin:14px 0 8px;padding-bottom:5px;border-bottom:1px solid var(--border);}
+.milestones-row{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px;}
+.milestone-item{display:flex;flex-direction:column;align-items:center;padding:10px;border-radius:10px;border:1px solid var(--border);text-align:center;}
+.milestone-item.done{border-color:var(--green);background:rgba(61,170,119,.06);}
+.milestone-item .m-icon{font-size:22px;margin-bottom:4px;}
+.milestone-item .m-label{font-size:11px;font-weight:600;color:var(--sub);}
+.milestone-item.done .m-label{color:var(--green);}
+.cs-timeline{display:flex;flex-direction:column;gap:6px;}
+.cs-entry{display:flex;gap:10px;align-items:flex-start;padding:8px 10px;background:var(--bg);border-radius:8px;}
+.cs-entry-num{font-size:11px;font-weight:700;color:var(--white);background:var(--blue);padding:2px 7px;border-radius:4px;flex-shrink:0;margin-top:1px;}
+.cs-entry-date{font-size:12px;font-weight:600;color:var(--text);min-width:80px;}
+.cs-entry-memo{font-size:12px;color:var(--sub);}
+.notes-list{display:flex;flex-direction:column;gap:7px;}
+.note-item{background:var(--bg);border-radius:8px;padding:9px 12px;}
+.note-meta{font-size:11px;color:var(--sub);margin-bottom:3px;}
+.note-text{font-size:13px;line-height:1.6;}
+.add-note-area{display:flex;gap:7px;margin-top:9px;}
+.add-note-area textarea{flex:1;min-height:55px;}
+.stage-quick{display:flex;align-items:center;gap:10px;padding:12px;background:var(--bg);border-radius:10px;margin-bottom:14px;flex-wrap:wrap;}
+.stage-quick label{font-size:13px;font-weight:600;white-space:nowrap;}
+.stage-quick select{flex:1;min-width:160px;}
+
+/* ── MONTHLY ── */
+.monthly-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px;}
+.monthly-card{background:var(--white);border-radius:10px;padding:14px;border:1px solid var(--border);}
+.monthly-month{font-size:12px;color:var(--sub);margin-bottom:6px;}
+.monthly-nums{display:flex;gap:12px;}
+.monthly-num .n{font-size:20px;font-weight:900;color:var(--blue);}
+.monthly-num .l{font-size:10px;color:var(--sub);}
+.monthly-cvr{font-size:11px;color:var(--green);font-weight:700;margin-top:5px;}
+
+.empty-state{text-align:center;padding:50px 20px;color:var(--sub);}
+.empty-state .icon{font-size:44px;margin-bottom:10px;}
+</style>
+</head>
+<body>
+
+<!-- ── ログイン画面 ── -->
+<div class="login-screen" id="login-screen">
+  <div class="login-box">
+    <div class="login-logo">One's Passport CRM</div>
+    <div class="login-sub">チームメンバーのみアクセス可能</div>
+    <label class="login-label">メールアドレス</label>
+    <input class="login-input" type="email" id="login-email" placeholder="example@email.com" autocomplete="email">
+    <label class="login-label">パスワード</label>
+    <input class="login-input" type="password" id="login-pass" placeholder="••••••••" autocomplete="current-password"
+      onkeydown="if(event.key==='Enter')doLogin()">
+    <button class="login-btn" onclick="doLogin()">ログイン</button>
+    <div class="login-err" id="login-err"></div>
+    <div class="login-loading" id="login-loading"></div>
+  </div>
+</div>
+
+<!-- ── ローディング ── -->
+<div class="page-loading" id="page-loading">
+  <div class="spinner"></div>
+  <span>読み込み中...</span>
+</div>
+
+<!-- ── アプリ本体 ── -->
+<div class="app" id="app">
+
+<!-- SIDEBAR -->
+<aside class="sidebar">
+  <div class="sidebar-logo">
+    <div class="brand">One's Passport CRM</div>
+    <small>顧客管理システム</small>
+  </div>
+  <nav class="sidebar-nav">
+    <div class="nav-section">メイン</div>
+    <div class="nav-item active" data-page="dashboard"><span class="nav-icon">📊</span> ダッシュボード</div>
+    <div class="nav-item" data-page="customers"><span class="nav-icon">👥</span> 顧客一覧</div>
+    <div class="nav-item" data-page="kanban"><span class="nav-icon">📋</span> ステージ管理</div>
+    <div class="nav-section">分析</div>
+    <div class="nav-item" data-page="monthly"><span class="nav-icon">📈</span> 月次レポート</div>
+  </nav>
+  <div class="sidebar-bottom">
+    <div class="user-info" id="user-email-display"></div>
+    <button class="logout-btn" onclick="doLogout()">🔓 ログアウト</button>
+  </div>
+</aside>
+
+<!-- MAIN -->
+<div class="main">
+
+<!-- DASHBOARD -->
+<div id="page-dashboard" class="page active">
+  <div class="topbar">
+    <div class="page-title">ダッシュボード</div>
+    <div class="topbar-right">
+      <button class="btn btn-ghost btn-sm" onclick="exportCSV()">⬇ CSV出力</button>
+      <button class="btn btn-primary" onclick="openAddModal()">＋ 顧客を追加</button>
+    </div>
+  </div>
+  <div class="content">
+    <div class="stat-grid" id="stat-grid"></div>
+    <div class="section-row">
+      <div class="panel"><div class="panel-title">ステージ別人数</div><div id="funnel-list"></div></div>
+      <div class="panel"><div class="panel-title">⚠️ フォロー要確認</div><div id="alert-list"></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- CUSTOMERS -->
+<div id="page-customers" class="page">
+  <div class="topbar">
+    <div class="page-title">顧客一覧</div>
+    <div class="topbar-right">
+      <button class="btn btn-ghost btn-sm" onclick="exportCSV()">⬇ CSV出力</button>
+      <button class="btn btn-primary" onclick="openAddModal()">＋ 顧客を追加</button>
+    </div>
+  </div>
+  <div class="content">
+    <div class="table-card">
+      <div class="table-toolbar">
+        <div class="search-row">
+          <input class="search-input" type="text" placeholder="名前で検索..." id="search-input" oninput="renderTable()">
+          <select class="filter-select" id="filter-stage" onchange="renderTable()"><option value="">全ステージ</option></select>
+          <select class="filter-select" id="filter-country" onchange="renderTable()">
+            <option value="">全ての国</option>
+            <option>フィリピン（セブ）</option><option>カナダ</option><option>オーストラリア</option><option>未定</option>
+          </select>
+          <select class="filter-select" id="filter-owner" onchange="renderTable()">
+            <option value="">全担当</option><option>Haruka</option><option>Tomomi</option>
+          </select>
+        </div>
+        <div id="table-count" style="font-size:12px;color:var(--sub)"></div>
+      </div>
+      <div id="table-container"></div>
+    </div>
+  </div>
+</div>
+
+<!-- KANBAN -->
+<div id="page-kanban" class="page">
+  <div class="topbar">
+    <div class="page-title">ステージ管理</div>
+    <button class="btn btn-primary" onclick="openAddModal()">＋ 顧客を追加</button>
+  </div>
+  <div class="content"><div class="kanban" id="kanban-board"></div></div>
+</div>
+
+<!-- MONTHLY -->
+<div id="page-monthly" class="page">
+  <div class="topbar"><div class="page-title">月次レポート</div></div>
+  <div class="content" id="monthly-content"></div>
+</div>
+
+</div><!-- /main -->
+</div><!-- /app -->
+
+<!-- ADD/EDIT MODAL -->
+<div class="modal-overlay hidden" id="add-modal">
+<div class="modal">
+  <div class="modal-header">
+    <div class="modal-title" id="modal-title">顧客を追加</div>
+    <button class="modal-close" onclick="closeAddModal()">✕</button>
+  </div>
+  <div class="modal-body">
+    <div class="form-section">
+      <div class="form-section-title">基本情報</div>
+      <div class="form-grid">
+        <div class="form-group"><label>名前 *</label><input type="text" id="f-name" placeholder="山田 花子"></div>
+        <div class="form-group"><label>担当</label><select id="f-owner"><option>Haruka</option><option>Tomomi</option></select></div>
+        <div class="form-group"><label>年齢</label><input type="number" id="f-age" placeholder="22"></div>
+        <div class="form-group"><label>職業</label><select id="f-job"><option value="">選択</option><option>大学生</option><option>社会人</option><option>フリーランス</option><option>その他</option></select></div>
+        <div class="form-group"><label>性別</label><select id="f-gender"><option value="">選択</option><option>女性</option><option>男性</option><option>その他</option></select></div>
+        <div class="form-group"><label>LINE ID / 連絡先</label><input type="text" id="f-contact" placeholder="@hanako"></div>
+      </div>
+    </div>
+    <div class="form-section">
+      <div class="form-section-title">流入元</div>
+      <div class="form-grid">
+        <div class="form-group"><label>流入元（大項目）</label><select id="f-source"><option value="">選択</option><option>ワンパス</option><option>紹介</option><option>ウェビナー</option><option>その他</option></select></div>
+        <div class="form-group"><label>流入元（詳細）</label><select id="f-source-detail"><option value="">選択</option><option>LP</option><option>Threads</option><option>Instagram</option><option>お名前→</option><option>FB</option><option>その他</option></select></div>
+        <div class="form-group full"><label>流入元メモ</label><input type="text" id="f-source-memo" placeholder="例: ○○さんの紹介"></div>
+      </div>
+    </div>
+    <div class="form-section">
+      <div class="form-section-title">留学希望</div>
+      <div class="form-grid">
+        <div class="form-group"><label>渡航興味国</label><select id="f-dest"><option value="">選択</option><option>フィリピン（セブ）</option><option>カナダ</option><option>オーストラリア</option><option>未定</option></select></div>
+        <div class="form-group"><label>留学種別</label><select id="f-type"><option value="">選択</option><option>語学留学</option><option>ワーホリ</option><option>語学＋専門（co-op）</option><option>学生ビザ</option><option>ボランティア留学</option><option>親子留学</option><option>未定</option></select></div>
+        <div class="form-group"><label>希望期間</label><select id="f-duration"><option value="">選択</option><option>1ヶ月</option><option>2ヶ月</option><option>3ヶ月</option><option>6ヶ月</option><option>12ヶ月</option><option>未定</option></select></div>
+        <div class="form-group"><label>希望渡航時期</label><input type="text" id="f-timing" placeholder="例: 2026年7〜8月"></div>
+        <div class="form-group"><label>予算感</label><select id="f-budget"><option value="">選択</option><option>〜30万円</option><option>30〜50万円</option><option>50〜80万円</option><option>80万円以上</option><option>未定</option></select></div>
+        <div class="form-group"><label>ステップ配信</label><select id="f-step"><option value="">なし</option><option>ワンパス通常</option><option>ワンパスウェビナー</option><option>なな配信</option><option>その他</option></select></div>
+      </div>
+    </div>
+    <div class="form-section">
+      <div class="form-section-title">学校・契約情報（契約後に入力）</div>
+      <div class="form-grid">
+        <div class="form-group"><label>学校名</label><input type="text" id="f-school" placeholder="例: ILSC Vancouver"></div>
+        <div class="form-group"><label>コース名</label><input type="text" id="f-course" placeholder="例: General English"></div>
+        <div class="form-group"><label>留学期間（週数）</label><input type="number" id="f-weeks" placeholder="12"></div>
+        <div class="form-group"><label>学費</label><input type="text" id="f-tuition" placeholder="例: AUD 3,200"></div>
+        <div class="form-group"><label>渡航日</label><input type="date" id="f-departure"></div>
+        <div class="form-group"><label>帰国日</label><input type="date" id="f-return"></div>
+      </div>
+    </div>
+    <div class="form-section">
+      <div class="form-section-title">マイルストーン</div>
+      <div class="form-grid">
+        <div class="form-group"><label>ステージ</label><select id="f-stage"><option>LINE追加済み</option><option>初回CS済み</option><option>継続CS中</option><option>渡航前準備中</option><option>デポジット済み</option><option>契約完了</option><option>渡航中</option><option>渡航完了</option><option>キャンセル</option></select></div>
+        <div class="form-group"><label>次回フォロー日</label><input type="date" id="f-followup"></div>
+        <div class="form-group" style="align-items:flex-start">
+          <label style="margin-bottom:6px">エルメタグ変更</label>
+          <label class="checkbox-row" id="elme-row"><input type="checkbox" id="f-elme" onchange="toggleCbRow('elme-row',this)"><span>完了</span></label>
+        </div>
+        <div class="form-group" style="align-items:flex-start">
+          <label style="margin-bottom:6px">デポジット支払い</label>
+          <label class="checkbox-row" id="deposit-row"><input type="checkbox" id="f-deposit" onchange="toggleCbRow('deposit-row',this)"><span>支払い済み</span></label>
+        </div>
+        <div class="form-group" style="align-items:flex-start">
+          <label style="margin-bottom:6px">契約（支払い済み）</label>
+          <label class="checkbox-row" id="contract-row"><input type="checkbox" id="f-contract" onchange="toggleCbRow('contract-row',this)"><span>契約完了</span></label>
+        </div>
+      </div>
+    </div>
+    <div class="form-section">
+      <div class="form-section-title">カウンセリング記録</div>
+      <div class="cs-sessions" id="cs-sessions-edit"></div>
+      <button class="cs-add-btn" onclick="addCSField()">＋ セッションを追加</button>
+    </div>
+    <div class="form-section">
+      <div class="form-section-title">メモ / キャンセル理由</div>
+      <div class="form-grid">
+        <div class="form-group full"><label>新規メモを追加</label><textarea id="f-note" placeholder="相談内容など"></textarea></div>
+        <div class="form-group full"><label>キャンセル・舞い戻り理由</label><textarea id="f-cancel-reason" placeholder="キャンセルした場合の理由"></textarea></div>
+      </div>
+    </div>
+  </div>
+  <div class="modal-footer">
+    <button class="btn btn-ghost" onclick="closeAddModal()">キャンセル</button>
+    <button class="btn btn-primary" id="save-btn" onclick="saveCustomer()">保存する</button>
+  </div>
+</div>
+</div>
+
+<!-- DETAIL MODAL -->
+<div class="modal-overlay hidden" id="detail-modal">
+<div class="modal">
+  <div class="modal-header">
+    <div>
+      <div class="modal-title" id="detail-name">顧客詳細</div>
+      <div id="detail-subtitle" style="font-size:11px;color:var(--sub);margin-top:2px;"></div>
+    </div>
+    <button class="modal-close" onclick="closeDetailModal()">✕</button>
+  </div>
+  <div class="modal-body">
+    <div class="stage-quick">
+      <label>ステージ</label>
+      <select id="detail-stage-select" onchange="quickUpdateStage(this.value)"></select>
+      <button class="btn btn-ghost btn-sm" onclick="quickFollowup()">📅 フォロー日変更</button>
+    </div>
+    <div class="detail-tabs">
+      <div class="detail-tab active" data-tab="info">基本情報</div>
+      <div class="detail-tab" data-tab="cs">CS記録</div>
+      <div class="detail-tab" data-tab="travel">渡航・学校</div>
+      <div class="detail-tab" data-tab="notes">メモ</div>
+    </div>
+    <div id="detail-tab-info" class="detail-tab-content active"></div>
+    <div id="detail-tab-cs" class="detail-tab-content"></div>
+    <div id="detail-tab-travel" class="detail-tab-content"></div>
+    <div id="detail-tab-notes" class="detail-tab-content"></div>
+  </div>
+  <div class="modal-footer">
+    <button class="btn btn-danger btn-sm" onclick="deleteCustomer()">削除</button>
+    <button class="btn btn-ghost" onclick="closeDetailModal()">閉じる</button>
+    <button class="btn btn-primary" onclick="editFromDetail()">編集</button>
+  </div>
+</div>
+</div>
+
+<script>
+// ━━━━━━━ SUPABASE ━━━━━━━
+const { createClient } = supabase;
+const sb = createClient(
+  'https://zibixluyzqifscsklgzz.supabase.co',
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InppYml4bHV5enFpZnNjc2tsZ3p6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc3ODIwNTksImV4cCI6MjA5MzM1ODA1OX0.p4Q8yiK2ZtzhYz_qOZIU26oaTrl01vOltz1X-37EKAk'
+);
+
+const STAGES = ['LINE追加済み','初回CS済み','継続CS中','渡航前準備中','デポジット済み','契約完了','渡航中','渡航完了','キャンセル'];
+const STAGE_COLORS = {
+  'LINE追加済み':'#649abd','初回CS済み':'#8b9cf7','継続CS中':'#BEAEBB',
+  '渡航前準備中':'#f59e0b','デポジット済み':'#f97316','契約完了':'#3DAA77',
+  '渡航中':'#10b981','渡航完了':'#6b7280','キャンセル':'#ef4444'
+};
+
+let customers = [];
+let editingId = null, viewingId = null;
+let sortCol = 'num', sortDir = 1;
+let csCount = 0;
+let tablePage = 1;
+const TABLE_PER_PAGE = 50;
+let _currentSession = null; // セッションを保持
+
+// ※ ログイン画面はHTMLで最初からvisibleにしてあるので即表示される
+
+// ━━━━━━━ AUTH ━━━━━━━
+function showLogin(){ document.getElementById('login-screen').classList.remove('hidden'); document.getElementById('app').classList.remove('visible'); }
+function showApp(email){
+  document.getElementById('login-screen').classList.add('hidden');
+  document.getElementById('app').classList.add('visible');
+  document.getElementById('user-email-display').textContent = email;
+}
+function showPageLoading(v){ /* スピナー廃止 */ }
+
+async function doLogin(){
+  const email = document.getElementById('login-email').value.trim();
+  const pass  = document.getElementById('login-pass').value;
+  const errEl = document.getElementById('login-err');
+  const ldEl  = document.getElementById('login-loading');
+  errEl.textContent = ''; ldEl.textContent = 'ログイン中...';
+  const { error } = await sb.auth.signInWithPassword({ email, password: pass });
+  ldEl.textContent = '';
+  if(error){ errEl.textContent = 'メールアドレスまたはパスワードが違います'; return; }
+}
+
+async function doLogout(){
+  await sb.auth.signOut();
+  customers = [];
+  showLogin();
+}
+
+let appReady = false; // 二重発火防止フラグ
+
+sb.auth.onAuthStateChange(async (event, session) => {
+  if(event === 'SIGNED_OUT' || !session){
+    appReady = false;
+    customers = [];
+    showLogin();
+    return;
+  }
+  // INITIAL_SESSION と SIGNED_IN のどちらか1回だけ処理する
+  if(appReady) return;
+  appReady = true;
+  _currentSession = session;
+
+  showApp(session.user.email);
+  // セッションを直接渡してデータ取得（getSession()の余計なネットワーク呼び出しを省く）
+  try {
+    await loadCustomers(session);
+  } catch(e) {
+    console.error('load error:', e);
+    document.getElementById('stat-grid') && (document.getElementById('stat-grid').innerHTML =
+      `<div style="color:red;padding:16px;grid-column:1/-1">❌ エラー: ${e.message}</div>`);
+  }
+  renderDashboard();
+});
+
+// ━━━━━━━ DATA (Supabase) ━━━━━━━
+async function loadCustomers(session){
+  const SUPABASE_URL = 'https://zibixluyzqifscsklgzz.supabase.co';
+  const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InppYml4bHV5enFpZnNjc2tsZ3p6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc3ODIwNTksImV4cCI6MjA5MzM1ODA1OX0.p4Q8yiK2ZtzhYz_qOZIU26oaTrl01vOltz1X-37EKAk';
+  const token = session?.access_token || ANON_KEY;
+
+  function showDiag(msg, color='#333'){
+    const el = document.getElementById('stat-grid');
+    if(el) el.innerHTML = `<div style="padding:16px;font-size:13px;color:${color};background:#f9f9f9;border-radius:10px;border:1px solid #ddd;grid-column:1/-1">${msg}</div>`;
+  }
+
+  // Supabase JSクライアントを経由せず直接REST APIで取得
+  let res;
+  try {
+    res = await fetch(
+      `${SUPABASE_URL}/rest/v1/customers?order=num.asc&limit=1000`,
+      {
+        headers: {
+          'apikey': ANON_KEY,
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+  } catch(e) {
+    showDiag(`❌ ネットワークエラー: ${e.message}<br><small>SupabaseへのアクセスがブロックされているかCORSエラーです</small>`, 'red');
+    customers = [];
+    return;
+  }
+
+  if(!res.ok){
+    const txt = await res.text();
+    showDiag(`❌ APIエラー ${res.status}: ${txt}`, 'red');
+    customers = [];
+    return;
+  }
+
+  customers = await res.json();
+}
+
+function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2); }
+function nextNum(){ return customers.length ? Math.max(...customers.map(c=>c.num||0)) + 1 : 1; }
+
+function _apiHeaders(){
+  const session = sb.auth.session?.() || null;
+  const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InppYml4bHV5enFpZnNjc2tsZ3p6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc3ODIwNTksImV4cCI6MjA5MzM1ODA1OX0.p4Q8yiK2ZtzhYz_qOZIU26oaTrl01vOltz1X-37EKAk';
+  const token = _currentSession?.access_token || ANON_KEY;
+  return { 'apikey': ANON_KEY, 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' };
+}
+
+async function upsert(record){
+  const res = await fetch(
+    `https://zibixluyzqifscsklgzz.supabase.co/rest/v1/customers?on_conflict=id`,
+    { method: 'POST', headers: { ..._apiHeaders(), 'Prefer': 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify(record) }
+  );
+  if(!res.ok){ const t=await res.text(); throw new Error(t); }
+}
+
+async function dbDelete(id){
+  const res = await fetch(
+    `https://zibixluyzqifscsklgzz.supabase.co/rest/v1/customers?id=eq.${id}`,
+    { method: 'DELETE', headers: _apiHeaders() }
+  );
+  if(!res.ok){ const t=await res.text(); throw new Error(t); }
+}
+
+// ━━━━━━━ NAV ━━━━━━━
+document.querySelectorAll('.nav-item').forEach(el=>{
+  el.addEventListener('click', function(){
+    document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+    document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+    this.classList.add('active');
+    const page = this.dataset.page;
+    document.getElementById('page-'+page).classList.add('active');
+    if(page==='dashboard') renderDashboard();
+    if(page==='customers') renderTable();
+    if(page==='kanban') renderKanban();
+    if(page==='monthly') renderMonthly();
+  });
+});
+
+// ━━━━━━━ DASHBOARD ━━━━━━━
+function renderDashboard(){
+  const now=new Date(), tm=now.getMonth(), ty=now.getFullYear();
+  const total = customers.length;
+  const converted = customers.filter(c=>['契約完了','渡航中','渡航完了'].includes(c.stage)).length;
+  const newThis = customers.filter(c=>{ const d=parseDate(c.created_at); return d&&d.getMonth()===tm&&d.getFullYear()===ty; }).length;
+  const cvr = total>0 ? Math.round(converted/total*100) : 0;
+  const today = new Date(); today.setHours(0,0,0,0);
+  const followPending = customers.filter(c=>c.follow_up && new Date(c.follow_up)<=today).length;
+
+  document.getElementById('stat-grid').innerHTML = `
+    <div class="stat-card"><div class="stat-label">総顧客数</div><div class="stat-val grad">${total}</div><div class="stat-sub">累計</div></div>
+    <div class="stat-card"><div class="stat-label">今月新規</div><div class="stat-val grad">${newThis}</div><div class="stat-sub">人</div></div>
+    <div class="stat-card"><div class="stat-label">契約完了</div><div class="stat-val grad">${converted}</div><div class="stat-sub">累計</div></div>
+    <div class="stat-card"><div class="stat-label">成約率</div><div class="stat-val grad">${cvr}%</div><div class="stat-sub">契約 / 総顧客</div></div>
+    <div class="stat-card"><div class="stat-label">要フォロー</div><div class="stat-val" style="color:var(--red)">${followPending}</div><div class="stat-sub">期限切れ / 今日</div></div>
+  `;
+
+  const maxN = Math.max(...STAGES.map(s=>customers.filter(c=>c.stage===s).length), 1);
+  document.getElementById('funnel-list').innerHTML = STAGES.map(s=>{
+    const n = customers.filter(c=>c.stage===s).length;
+    return `<div class="funnel-item">
+      <div class="funnel-label"><span style="color:${STAGE_COLORS[s]};font-weight:600">${s}</span></div>
+      <div class="funnel-bar-wrap"><div class="funnel-bar" style="width:${Math.round(n/maxN*100)}%;background:${STAGE_COLORS[s]}"></div></div>
+      <div class="funnel-count">${n}</div>
+    </div>`;
+  }).join('');
+
+  const soon = new Date(today); soon.setDate(soon.getDate()+3);
+  const alerts = customers.filter(c=>c.follow_up && new Date(c.follow_up)<=soon)
+    .sort((a,b)=>new Date(a.follow_up)-new Date(b.follow_up));
+  document.getElementById('alert-list').innerHTML = alerts.length
+    ? alerts.slice(0,6).map(c=>{
+        const overdue = new Date(c.follow_up)<today;
+        return `<div class="alert-item ${overdue?'overdue':''}" onclick="openDetail('${c.id}')">
+          <div><div style="font-weight:600">${c.name}</div><div style="font-size:11px;color:var(--sub)">${c.stage}</div></div>
+          <div style="font-size:11px">${fmtDate(c.follow_up)}</div>
+        </div>`;
+      }).join('')
+    : '<div style="font-size:12px;color:var(--sub);text-align:center;padding:20px">要確認の顧客はいません ✓</div>';
+}
+
+// ━━━━━━━ TABLE ━━━━━━━
+function renderTable(){
+  const sf = document.getElementById('filter-stage');
+  if(sf.options.length<=1) STAGES.forEach(s=>{ const o=document.createElement('option');o.value=s;o.textContent=s;sf.appendChild(o); });
+
+  const q = document.getElementById('search-input').value.toLowerCase();
+  const stageV = sf.value;
+  const cntryV = document.getElementById('filter-country').value;
+  const ownrV  = document.getElementById('filter-owner').value;
+
+  let list = customers.filter(c=>{
+    if(q && !c.name.toLowerCase().includes(q)) return false;
+    if(stageV && c.stage!==stageV) return false;
+    if(cntryV && c.destination!==cntryV) return false;
+    if(ownrV  && c.owner!==ownrV) return false;
+    return true;
+  }).sort((a,b)=>{
+    let av=a[sortCol]||'', bv=b[sortCol]||'';
+    if(sortCol==='num'){ return ((a.num||0)-(b.num||0))*sortDir; }
+    return av<bv ? -sortDir : av>bv ? sortDir : 0;
+  });
+
+  const totalCount = list.length;
+  document.getElementById('table-count').textContent = `${totalCount} 件`;
+  if(!totalCount){ document.getElementById('table-container').innerHTML='<div class="empty-state"><div class="icon">👥</div><p>条件に合う顧客がいません</p></div>'; return; }
+
+  // ページネーション
+  const totalPages = Math.ceil(totalCount / TABLE_PER_PAGE);
+  if(tablePage > totalPages) tablePage = totalPages;
+  const paged = list.slice((tablePage-1)*TABLE_PER_PAGE, tablePage*TABLE_PER_PAGE);
+
+  const today=new Date(); today.setHours(0,0,0,0);
+  const soon=new Date(today); soon.setDate(soon.getDate()+3);
+  const sa = col => `<span class="sort-arrow">${sortCol===col?(sortDir===1?'↑':'↓'):'↕'}</span>`;
+
+  const pageNav = totalPages > 1 ? `
+    <div style="display:flex;align-items:center;gap:8px;padding:10px 16px;border-top:1px solid var(--border);font-size:13px;">
+      <button class="btn btn-ghost btn-sm" onclick="tablePageGo(${tablePage-1})" ${tablePage<=1?'disabled':''}>← 前へ</button>
+      <span style="color:var(--sub)">${tablePage} / ${totalPages} ページ（全${totalCount}件）</span>
+      <button class="btn btn-ghost btn-sm" onclick="tablePageGo(${tablePage+1})" ${tablePage>=totalPages?'disabled':''}>次へ →</button>
+    </div>` : '';
+
+  document.getElementById('table-container').innerHTML=`
+  <table>
+    <thead><tr>
+      <th class="${sortCol==='num'?'sorted':''}" onclick="setSort('num')"># ${sa('num')}</th>
+      <th class="${sortCol==='name'?'sorted':''}" onclick="setSort('name')">名前 ${sa('name')}</th>
+      <th class="${sortCol==='stage'?'sorted':''}" onclick="setSort('stage')">ステージ ${sa('stage')}</th>
+      <th>CS回数</th><th>マイルストーン</th>
+      <th class="${sortCol==='destination'?'sorted':''}" onclick="setSort('destination')">渡航先 ${sa('destination')}</th>
+      <th>流入元</th><th>担当</th>
+      <th class="${sortCol==='follow_up'?'sorted':''}" onclick="setSort('follow_up')">次回フォロー ${sa('follow_up')}</th>
+      <th class="${sortCol==='created_at'?'sorted':''}" onclick="setSort('created_at')">初回CS日 ${sa('created_at')}</th>
+    </tr></thead>
+    <tbody>
+    ${paged.map(c=>{
+      const sessions=(c.cs_sessions||[]).filter(s=>s.date);
+      let fc='';
+      if(c.follow_up){ const fd=parseDate(c.follow_up); if(fd&&fd<today) fc='color:var(--red);font-weight:700'; else if(fd&&fd<=soon) fc='color:var(--orange);font-weight:600'; }
+      return `<tr onclick="openDetail('${c.id}')">
+        <td><span class="num-badge">${c.num||'―'}</span></td>
+        <td><strong>${c.name}</strong></td>
+        <td><span class="badge" style="background:${STAGE_COLORS[c.stage]||'#ccc'}22;color:${STAGE_COLORS[c.stage]||'#666'}">${c.stage}</span></td>
+        <td style="text-align:center;font-weight:700;color:var(--blue)">${sessions.length}</td>
+        <td><div class="milestone-dots">
+          ${[c.elme,c.deposit,c.contract].map(v=>`<div class="milestone-dot ${v?'done':''}"></div>`).join('')}
+        </div></td>
+        <td>${c.destination||'―'}</td>
+        <td>${c.source?`<span class="source-badge">${c.source}</span>`:''} ${c.source_detail?`<span style="font-size:11px;color:var(--sub)">${c.source_detail}</span>`:''}</td>
+        <td>${c.owner||'―'}</td>
+        <td><span style="${fc}">${c.follow_up?fmtDate(c.follow_up):'―'}</span></td>
+        <td style="color:var(--sub)">${fmtDate(c.created_at)}</td>
+      </tr>`;
+    }).join('')}
+    </tbody>
+  </table>
+  ${pageNav}`;
+}
+
+function setSort(col){ if(sortCol===col) sortDir*=-1; else {sortCol=col;sortDir=1;} tablePage=1; renderTable(); }
+function tablePageGo(p){ tablePage=p; renderTable(); document.querySelector('.main').scrollTop=0; }
+
+// ━━━━━━━ KANBAN ━━━━━━━
+function renderKanban(){
+  const today = new Date(); today.setHours(0,0,0,0);
+  const KANBAN_STAGES = STAGES.filter(s => s !== 'LINE追加済み'); // ① LINE追加済みを非表示
+
+  document.getElementById('kanban-board').innerHTML = KANBAN_STAGES.map(stage=>{
+    const cols = customers.filter(c=>c.stage===stage);
+    return `<div class="kanban-col">
+      <div class="kanban-col-header">
+        <div class="kanban-col-title" style="color:${STAGE_COLORS[stage]}">${stage}</div>
+        <div class="kanban-count">${cols.length}</div>
+      </div>
+      ${cols.map(c=>{
+        const n=(c.cs_sessions||[]).filter(s=>s.date).length;
+        // ② 初回CS済みで3週間以上経過・進捗なし → ピンク
+        let stale = false;
+        let staleDays = 0;
+        if(stage === '初回CS済み' && n <= 1){
+          const firstDate = parseDate(c.created_at);
+          if(firstDate){
+            staleDays = Math.floor((today - firstDate) / 86400000);
+            if(staleDays >= 21) stale = true;
+          }
+        }
+        return `<div class="kanban-card${stale?' stale':''}" onclick="openDetail('${c.id}')">
+          <div class="kanban-card-num">#${c.num||'―'}</div>
+          <div class="kanban-card-name">${c.name}</div>
+          <div class="kanban-card-meta">${c.destination||''} ${c.type||''}</div>
+          ${n?`<div class="kanban-card-cs" style="color:${STAGE_COLORS[stage]}">CS ${n}回</div>`:''}
+          ${stale?`<div class="kanban-stale-badge">⚠️ 初回CS から ${staleDays}日経過</div>`:''}
+          <div class="milestone-dots" style="margin-top:5px">
+            ${[c.elme,c.deposit,c.contract].map(v=>`<div class="milestone-dot ${v?'done':''}"></div>`).join('')}
+          </div>
+        </div>`;
+      }).join('')}
+    </div>`;
+  }).join('');
+}
+
+// ━━━━━━━ MONTHLY ━━━━━━━
+let reportTab = 'summary';
+function switchReportTab(t){
+  reportTab=t;
+  document.querySelectorAll('.report-tab').forEach(el=>el.classList.toggle('active', el.dataset.tab===t));
+  document.querySelectorAll('.report-section').forEach(el=>el.classList.toggle('active', el.id==='rs-'+t));
+}
+
+function renderMonthly(){
+  const now=new Date();
+
+  // ③ コホートデータ構築（月ごと × 渡航先）
+  const COUNTRIES = ['オーストラリア','カナダ','フィリピン（セブ）'];
+  const MONTHS = [];
+  for(let i=11;i>=0;i--){
+    const d=new Date(now.getFullYear(),now.getMonth()-i,1);
+    MONTHS.push({y:d.getFullYear(), m:d.getMonth(), label:`${d.getFullYear()}年${d.getMonth()+1}月`});
+  }
+
+  // 月×渡航先でコホートデータ
+  function getCohort(y, m, dest){
+    const group = customers.filter(c=>{
+      const cd=parseDate(c.created_at);
+      if(!cd||cd.getFullYear()!==y||cd.getMonth()!==m) return false;
+      if(c.stage==='キャンセル') return false;
+      if(dest && c.destination!==dest) return false;
+      return true;
+    });
+    const cs2 = group.filter(c=>(c.cs_sessions||[]).filter(s=>s.date).length>=2).length;
+    const contracted = group.filter(c=>c.contract).length;
+    return { total:group.length, cs2, contracted };
+  }
+
+  // ── サマリーHTML ──
+  let summaryHtml = '<div class="monthly-grid">';
+  for(let i=5;i>=0;i--){
+    const d=new Date(now.getFullYear(),now.getMonth()-i,1);
+    const y=d.getFullYear(),m=d.getMonth();
+    const all = getCohort(y,m,null);
+    const cvr = all.total>0?Math.round(all.contracted/all.total*100):0;
+    const cs2r = all.total>0?Math.round(all.cs2/all.total*100):0;
+    summaryHtml+=`<div class="monthly-card">
+      <div class="monthly-month">${y}年${m+1}月</div>
+      <div class="monthly-nums">
+        <div class="monthly-num"><div class="n">${all.total}</div><div class="l">初回CS</div></div>
+        <div class="monthly-num"><div class="n" style="color:var(--mauve)">${all.cs2}</div><div class="l">2回目</div></div>
+        <div class="monthly-num"><div class="n" style="color:var(--green)">${all.contracted}</div><div class="l">契約</div></div>
+      </div>
+      <div class="monthly-cvr">2回目率 ${cs2r}% ／ 成約率 ${cvr}%</div>
+    </div>`;
+  }
+  summaryHtml+='</div>';
+
+  // 流入元バーチャート
+  const sources = [...new Set(customers.map(c=>c.source).filter(Boolean))].sort();
+  const maxSrc = Math.max(...sources.map(s=>customers.filter(c=>c.source===s).length),1);
+  summaryHtml+=`<div class="panel"><div class="panel-title">流入元別 顧客数</div>`;
+  sources.forEach(s=>{
+    const n=customers.filter(c=>c.source===s).length;
+    summaryHtml+=`<div class="funnel-item">
+      <div class="funnel-label" style="width:140px">${s}</div>
+      <div class="funnel-bar-wrap"><div class="funnel-bar" style="width:${Math.round(n/maxSrc*100)}%;background:var(--mauve)"></div></div>
+      <div class="funnel-count">${n}</div></div>`;
+  });
+  summaryHtml+='</div>';
+
+  // ── コホート表HTML ──
+  function cohortTable(dest, label){
+    let html=`<div class="panel cohort-wrap" style="margin-bottom:16px">
+      <div class="panel-title">● ${label}</div>
+      <table class="cohort-table">
+        <thead><tr>
+          <th>月</th><th>初回CS数</th><th>2回目CS数</th><th>2回目率</th><th>契約数</th><th>契約率</th>
+        </tr></thead><tbody>`;
+    MONTHS.forEach(({y,m,label})=>{
+      const c=getCohort(y,m,dest);
+      const cs2r=c.total>0?Math.round(c.cs2/c.total*100):null;
+      const cvr=c.total>0?Math.round(c.contracted/c.total*100):null;
+      html+=`<tr>
+        <td class="month-label">${label}</td>
+        <td class="${c.total?'num':'zero'}">${c.total||'―'}</td>
+        <td class="${c.cs2?'num':'zero'}">${c.total?c.cs2:'―'}</td>
+        <td class="${cs2r!==null?'rate':'zero'}">${cs2r!==null?cs2r+'%':'―'}</td>
+        <td class="${c.contracted?'contracted':'zero'}">${c.total?c.contracted:'―'}</td>
+        <td class="${cvr!==null?'crate':'zero'}">${cvr!==null?cvr+'%':'―'}</td>
+      </tr>`;
+    });
+    html+='</tbody></table></div>';
+    return html;
+  }
+
+  let cohortHtml = cohortTable(null,'全体');
+  cohortHtml += cohortTable('オーストラリア','オーストラリア');
+  cohortHtml += cohortTable('カナダ','カナダ');
+  cohortHtml += cohortTable('フィリピン（セブ）','フィリピン（セブ）');
+
+  // ④ 国別・留学種別 分析HTML
+  function avgDaysToCS2(filterFn){
+    const group = customers.filter(c=>c.contract && filterFn(c));
+    const diffs = group.map(c=>{
+      const first = parseDate(c.created_at);
+      const sessions = (c.cs_sessions||[]).filter(s=>s.date);
+      const last = sessions.length>=2 ? parseDate(sessions[sessions.length-1].date) : null;
+      if(!first||!last) return null;
+      return Math.floor((last-first)/86400000);
+    }).filter(d=>d!==null&&d>0);
+    if(!diffs.length) return null;
+    return Math.round(diffs.reduce((a,b)=>a+b,0)/diffs.length);
+  }
+
+  function analysisCard(title, rows){
+    return `<div class="analysis-card">
+      <div class="analysis-title">${title}</div>
+      ${rows.map(([label, filterFn])=>{
+        const total = customers.filter(c=>filterFn(c)&&!['キャンセル'].includes(c.stage)).length;
+        const contracts = customers.filter(c=>c.contract&&filterFn(c)).length;
+        const cvr = total>0?Math.round(contracts/total*100):0;
+        const avgDays = avgDaysToCS2(filterFn);
+        return `<div class="analysis-row">
+          <span class="analysis-label">${label}</span>
+          <span class="analysis-val">
+            <span style="color:var(--blue)">${total}人</span>
+            <span style="color:var(--green);margin-left:8px">契約${contracts}(${cvr}%)</span>
+            ${avgDays!==null?`<span style="color:var(--sub);font-size:11px;margin-left:6px">平均${avgDays}日</span>`:''}
+          </span>
+        </div>`;
+      }).join('')}
+    </div>`;
+  }
+
+  const destRows = [
+    ['オーストラリア', c=>c.destination==='オーストラリア'],
+    ['カナダ',         c=>c.destination==='カナダ'],
+    ['フィリピン（セブ）', c=>c.destination==='フィリピン（セブ）'],
+    ['2か国',         c=>c.destination==='2か国'],
+    ['その他・未定',   c=>!['オーストラリア','カナダ','フィリピン（セブ）','2か国'].includes(c.destination)],
+  ];
+
+  const typeRows = [...new Set(customers.map(c=>c.type).filter(Boolean))].sort().map(t=>[
+    t, c=>c.type===t
+  ]);
+
+  const sourceRows = [...new Set(customers.map(c=>c.source).filter(Boolean))].sort().map(s=>[
+    s, c=>c.source===s
+  ]);
+
+  let analysisHtml = `<div class="analysis-grid">
+    ${analysisCard('🌏 渡航先別 成約分析（初回CS→CS進捗の平均日数）', destRows)}
+    ${analysisCard('📋 留学種別 成約分析', typeRows.length ? typeRows : [['データなし',()=>false]])}
+  </div>
+  <div class="analysis-grid">
+    ${analysisCard('📣 流入元別 成約分析', sourceRows.length ? sourceRows : [['データなし',()=>false]])}
+    <div class="analysis-card">
+      <div class="analysis-title">📊 全体サマリー</div>
+      ${[
+        ['総顧客数（キャンセル除く）', customers.filter(c=>c.stage!=='キャンセル').length+'人'],
+        ['契約完了', customers.filter(c=>c.contract).length+'人'],
+        ['全体成約率', customers.filter(c=>c.stage!=='キャンセル').length>0?Math.round(customers.filter(c=>c.contract).length/customers.filter(c=>c.stage!=='キャンセル').length*100)+'%':'―'],
+        ['2回目CS取得数', customers.filter(c=>(c.cs_sessions||[]).filter(s=>s.date).length>=2).length+'人'],
+        ['2回目CS取得率', customers.filter(c=>c.stage!=='キャンセル').length>0?Math.round(customers.filter(c=>(c.cs_sessions||[]).filter(s=>s.date).length>=2).length/customers.filter(c=>c.stage!=='キャンセル').length*100)+'%':'―'],
+      ].map(([l,v])=>`<div class="analysis-row"><span class="analysis-label">${l}</span><span class="analysis-val">${v}</span></div>`).join('')}
+    </div>
+  </div>`;
+
+  document.getElementById('monthly-content').innerHTML = `
+    <div class="report-tabs">
+      <div class="report-tab${reportTab==='summary'?' active':''}" data-tab="summary" onclick="switchReportTab('summary')">月次サマリー</div>
+      <div class="report-tab${reportTab==='cohort'?' active':''}" data-tab="cohort" onclick="switchReportTab('cohort')">コホート分析</div>
+      <div class="report-tab${reportTab==='analysis'?' active':''}" data-tab="analysis" onclick="switchReportTab('analysis')">国別・種別分析</div>
+    </div>
+    <div id="rs-summary" class="report-section${reportTab==='summary'?' active':''}">${summaryHtml}</div>
+    <div id="rs-cohort"  class="report-section${reportTab==='cohort'?' active':''}">${cohortHtml}</div>
+    <div id="rs-analysis" class="report-section${reportTab==='analysis'?' active':''}">${analysisHtml}</div>
+  `;
+}
+
+// ━━━━━━━ ADD/EDIT MODAL ━━━━━━━
+function openAddModal(id=null){
+  editingId=id; csCount=0;
+  document.getElementById('modal-title').textContent=id?'顧客を編集':'顧客を追加';
+  const textIds=['f-name','f-contact','f-age','f-timing','f-followup','f-note','f-cancel-reason','f-school','f-course','f-weeks','f-tuition','f-source-memo'];
+  const selIds=['f-job','f-source','f-source-detail','f-dest','f-type','f-duration','f-budget','f-step','f-stage','f-owner','f-gender'];
+  if(id){
+    const c=customers.find(x=>x.id===id);
+    document.getElementById('f-name').value=c.name||'';
+    document.getElementById('f-contact').value=c.contact||'';
+    document.getElementById('f-age').value=c.age||'';
+    document.getElementById('f-timing').value=c.timing||'';
+    document.getElementById('f-followup').value=c.follow_up||'';
+    document.getElementById('f-note').value='';
+    document.getElementById('f-cancel-reason').value=c.cancel_reason||'';
+    document.getElementById('f-school').value=c.school||'';
+    document.getElementById('f-course').value=c.course||'';
+    document.getElementById('f-weeks').value=c.weeks||'';
+    document.getElementById('f-tuition').value=c.tuition||'';
+    document.getElementById('f-source-memo').value=c.source_memo||'';
+    document.getElementById('f-departure').value=c.departure||'';
+    document.getElementById('f-return').value=c.return_date||'';
+    document.getElementById('f-job').value=c.job||'';
+    document.getElementById('f-source').value=c.source||'';
+    document.getElementById('f-source-detail').value=c.source_detail||'';
+    document.getElementById('f-dest').value=c.destination||'';
+    document.getElementById('f-type').value=c.type||'';
+    document.getElementById('f-duration').value=c.duration||'';
+    document.getElementById('f-budget').value=c.budget||'';
+    document.getElementById('f-step').value=c.step_type||'';
+    document.getElementById('f-stage').value=c.stage||'LINE追加済み';
+    document.getElementById('f-owner').value=c.owner||'Haruka';
+    document.getElementById('f-gender').value=c.gender||'';
+    document.getElementById('f-elme').checked=!!c.elme;
+    document.getElementById('f-deposit').checked=!!c.deposit;
+    document.getElementById('f-contract').checked=!!c.contract;
+    ['elme','deposit','contract'].forEach(k=>{ const row=document.getElementById(k+'-row'); if(row) row.classList.toggle('checked',!!c[k]); });
+    renderCSFields(c.cs_sessions||[]);
+  } else {
+    textIds.forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
+    selIds.forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
+    document.getElementById('f-stage').value='LINE追加済み';
+    document.getElementById('f-owner').value='Haruka';
+    document.getElementById('f-elme').checked=false;
+    document.getElementById('f-deposit').checked=false;
+    document.getElementById('f-contract').checked=false;
+    ['elme','deposit','contract'].forEach(k=>{ const row=document.getElementById(k+'-row'); if(row) row.classList.remove('checked'); });
+    renderCSFields([]);
+  }
+  document.getElementById('add-modal').classList.remove('hidden');
+}
+
+function toggleCbRow(rowId, cb){ document.getElementById(rowId).classList.toggle('checked', cb.checked); }
+
+function renderCSFields(sessions){
+  const container=document.getElementById('cs-sessions-edit');
+  container.innerHTML='';
+  const list=sessions.length?sessions:[{date:'',memo:''}];
+  list.forEach((s,i)=>{ csCount=i+1; addCSFieldWith(s.date||'',s.memo||'',csCount); });
+}
+
+function addCSField(){ csCount++; addCSFieldWith('','',csCount); }
+
+function addCSFieldWith(date,memo,n){
+  const div=document.createElement('div'); div.className='cs-session';
+  div.innerHTML=`<span class="cs-session-num">${n}回目</span>
+    <input type="date" value="${date}">
+    <input type="text" value="${memo}" placeholder="メモ">
+    <button class="cs-remove" onclick="this.parentElement.remove()">✕</button>`;
+  document.getElementById('cs-sessions-edit').appendChild(div);
+}
+
+function closeAddModal(){ document.getElementById('add-modal').classList.add('hidden'); editingId=null; }
+
+async function saveCustomer(){
+  const name=document.getElementById('f-name').value.trim();
+  if(!name){ alert('名前を入力してください'); return; }
+
+  const btn=document.getElementById('save-btn');
+  btn.textContent='保存中...'; btn.disabled=true;
+
+  const csSessions=[];
+  document.querySelectorAll('#cs-sessions-edit .cs-session').forEach((row,i)=>{
+    const inputs=row.querySelectorAll('input');
+    const date=inputs[0].value, memo=inputs[1].value;
+    if(date||memo) csSessions.push({num:i+1,date,memo});
+  });
+
+  const noteText=document.getElementById('f-note').value.trim();
+  const now=new Date().toISOString();
+
+  try {
+    if(editingId){
+      const c=customers.find(x=>x.id===editingId);
+      const notes=c.notes||[];
+      if(noteText) notes.unshift({date:now,text:noteText});
+      const record={
+        id:editingId, name, contact:document.getElementById('f-contact').value,
+        age:document.getElementById('f-age').value, gender:document.getElementById('f-gender').value,
+        job:document.getElementById('f-job').value, source:document.getElementById('f-source').value,
+        source_detail:document.getElementById('f-source-detail').value, source_memo:document.getElementById('f-source-memo').value,
+        owner:document.getElementById('f-owner').value, destination:document.getElementById('f-dest').value,
+        type:document.getElementById('f-type').value, duration:document.getElementById('f-duration').value,
+        timing:document.getElementById('f-timing').value, budget:document.getElementById('f-budget').value,
+        step_type:document.getElementById('f-step').value, school:document.getElementById('f-school').value,
+        course:document.getElementById('f-course').value, weeks:document.getElementById('f-weeks').value,
+        tuition:document.getElementById('f-tuition').value, departure:document.getElementById('f-departure').value||null,
+        return_date:document.getElementById('f-return').value||null, stage:document.getElementById('f-stage').value,
+        follow_up:document.getElementById('f-followup').value||null,
+        elme:document.getElementById('f-elme').checked, deposit:document.getElementById('f-deposit').checked,
+        contract:document.getElementById('f-contract').checked, cancel_reason:document.getElementById('f-cancel-reason').value,
+        cs_sessions:csSessions, notes, updated_at:now
+      };
+      await upsert(record);
+    } else {
+      const record={
+        id:uid(), num:nextNum(), name,
+        contact:document.getElementById('f-contact').value, age:document.getElementById('f-age').value,
+        gender:document.getElementById('f-gender').value, job:document.getElementById('f-job').value,
+        source:document.getElementById('f-source').value, source_detail:document.getElementById('f-source-detail').value,
+        source_memo:document.getElementById('f-source-memo').value, owner:document.getElementById('f-owner').value,
+        destination:document.getElementById('f-dest').value, type:document.getElementById('f-type').value,
+        duration:document.getElementById('f-duration').value, timing:document.getElementById('f-timing').value,
+        budget:document.getElementById('f-budget').value, step_type:document.getElementById('f-step').value,
+        school:document.getElementById('f-school').value, course:document.getElementById('f-course').value,
+        weeks:document.getElementById('f-weeks').value, tuition:document.getElementById('f-tuition').value,
+        departure:document.getElementById('f-departure').value||null, return_date:document.getElementById('f-return').value||null,
+        stage:document.getElementById('f-stage').value, follow_up:document.getElementById('f-followup').value||null,
+        elme:document.getElementById('f-elme').checked, deposit:document.getElementById('f-deposit').checked,
+        contract:document.getElementById('f-contract').checked, cancel_reason:document.getElementById('f-cancel-reason').value,
+        cs_sessions:csSessions, notes:noteText?[{date:now,text:noteText}]:[],
+        created_at:now, updated_at:now
+      };
+      await upsert(record);
+    }
+    await loadCustomers();
+    closeAddModal();
+    refresh();
+  } catch(e){
+    alert('保存に失敗しました: '+e.message);
+  } finally {
+    btn.textContent='保存する'; btn.disabled=false;
+  }
+}
+
+// ━━━━━━━ DETAIL MODAL ━━━━━━━
+function openDetail(id){
+  viewingId=id;
+  const c=customers.find(x=>x.id===id);
+  const ss=document.getElementById('detail-stage-select');
+  ss.innerHTML=STAGES.map(s=>`<option ${s===c.stage?'selected':''}>${s}</option>`).join('');
+  document.getElementById('detail-name').textContent=c.name;
+  document.getElementById('detail-subtitle').textContent=`#${c.num||'―'} ${c.owner||''} ${c.destination||''} ${c.type||''}`;
+
+  document.getElementById('detail-tab-info').innerHTML=`
+    <div class="detail-section-title">マイルストーン</div>
+    <div class="milestones-row">
+      <div class="milestone-item ${c.elme?'done':''}"><div class="m-icon">${c.elme?'✅':'⬜'}</div><div class="m-label">エルメタグ変更</div></div>
+      <div class="milestone-item ${c.deposit?'done':''}"><div class="m-icon">${c.deposit?'✅':'⬜'}</div><div class="m-label">デポジット支払い</div></div>
+      <div class="milestone-item ${c.contract?'done':''}"><div class="m-icon">${c.contract?'✅':'⬜'}</div><div class="m-label">契約（支払い済み）</div></div>
+    </div>
+    <div class="detail-section-title">基本情報</div>
+    <div class="detail-grid">
+      <div class="detail-item"><label>年齢 / 性別</label><span>${c.age?c.age+'歳':'―'} / ${c.gender||'―'}</span></div>
+      <div class="detail-item"><label>職業</label><span>${c.job||'―'}</span></div>
+      <div class="detail-item"><label>LINE / 連絡先</label><span>${c.contact||'―'}</span></div>
+      <div class="detail-item"><label>担当</label><span>${c.owner||'―'}</span></div>
+      <div class="detail-item"><label>次回フォロー日</label><span style="${followStyle(c)}">${c.follow_up?fmtDateFull(c.follow_up):'―'}</span></div>
+      <div class="detail-item"><label>登録日</label><span>${fmtDateFull(c.created_at)}</span></div>
+    </div>
+    <div class="detail-section-title">流入元</div>
+    <div class="detail-grid">
+      <div class="detail-item"><label>大項目</label><span>${c.source?`<span class="source-badge">${c.source}</span>`:''}</span></div>
+      <div class="detail-item"><label>詳細</label><span>${c.source_detail||'―'}</span></div>
+      <div class="detail-item full"><label>メモ</label><span>${c.source_memo||'―'}</span></div>
+    </div>
+    ${c.cancel_reason?`<div class="detail-section-title" style="color:var(--red)">キャンセル理由</div><div style="padding:10px;background:#fee2e2;border-radius:8px;font-size:13px">${c.cancel_reason}</div>`:''}
+    <div class="detail-section-title">留学希望</div>
+    <div class="detail-grid">
+      <div class="detail-item"><label>渡航興味国</label><span>${c.destination||'―'}</span></div>
+      <div class="detail-item"><label>留学種別</label><span>${c.type||'―'}</span></div>
+      <div class="detail-item"><label>希望期間</label><span>${c.duration||'―'}</span></div>
+      <div class="detail-item"><label>希望渡航時期</label><span>${c.timing||'―'}</span></div>
+      <div class="detail-item"><label>予算</label><span>${c.budget||'―'}</span></div>
+      <div class="detail-item"><label>ステップ配信</label><span>${c.step_type||'―'}</span></div>
+    </div>`;
+
+  const sessions=(c.cs_sessions||[]).filter(s=>s.date);
+  document.getElementById('detail-tab-cs').innerHTML=`
+    <div class="detail-section-title">カウンセリング記録（計 ${sessions.length} 回）</div>
+    <div class="cs-timeline">
+      ${sessions.length?sessions.map(s=>`<div class="cs-entry">
+        <div class="cs-entry-num">${s.num}回目</div>
+        <div class="cs-entry-date">${fmtDateFull(s.date)}</div>
+        <div class="cs-entry-memo">${s.memo||''}</div>
+      </div>`).join(''):'<div style="font-size:13px;color:var(--sub)">記録がありません</div>'}
+    </div>`;
+
+  document.getElementById('detail-tab-travel').innerHTML=`
+    <div class="detail-section-title">学校・コース</div>
+    <div class="detail-grid">
+      <div class="detail-item"><label>学校名</label><span>${c.school||'―'}</span></div>
+      <div class="detail-item"><label>コース名</label><span>${c.course||'―'}</span></div>
+      <div class="detail-item"><label>留学期間</label><span>${c.weeks?c.weeks+'週間':'―'}</span></div>
+      <div class="detail-item"><label>学費</label><span>${c.tuition||'―'}</span></div>
+    </div>
+    <div class="detail-section-title">渡航日程</div>
+    <div class="detail-grid">
+      <div class="detail-item"><label>渡航日</label><span>${c.departure?fmtDateFull(c.departure):'―'}</span></div>
+      <div class="detail-item"><label>帰国日</label><span>${c.return_date?fmtDateFull(c.return_date):'―'}</span></div>
+    </div>`;
+
+  const notes=c.notes||[];
+  document.getElementById('detail-tab-notes').innerHTML=`
+    <div class="notes-list">
+      ${notes.length?notes.map(n=>`<div class="note-item"><div class="note-meta">${fmtDateTime(n.date)}</div><div class="note-text">${n.text.replace(/\n/g,'<br>')}</div></div>`).join(''):'<div style="font-size:13px;color:var(--sub)">メモがありません</div>'}
+    </div>
+    <div class="add-note-area">
+      <textarea id="new-note-text" placeholder="メモを追加..."></textarea>
+      <button class="btn btn-primary btn-sm" onclick="addNote('${c.id}')">追加</button>
+    </div>`;
+
+  document.querySelectorAll('.detail-tab').forEach(tab=>{
+    tab.onclick=function(){
+      document.querySelectorAll('.detail-tab').forEach(t=>t.classList.remove('active'));
+      document.querySelectorAll('.detail-tab-content').forEach(t=>t.classList.remove('active'));
+      this.classList.add('active');
+      document.getElementById('detail-tab-'+this.dataset.tab).classList.add('active');
+    };
+  });
+  document.getElementById('detail-modal').classList.remove('hidden');
+}
+
+function closeDetailModal(){ document.getElementById('detail-modal').classList.add('hidden'); viewingId=null; }
+
+async function quickUpdateStage(stage){
+  const c=customers.find(x=>x.id===viewingId);
+  try { await upsert({...c, stage, updated_at:new Date().toISOString()}); await loadCustomers(); refresh(); openDetail(viewingId); }
+  catch(e){ alert('更新失敗: '+e.message); }
+}
+
+async function quickFollowup(){
+  const date=prompt('次回フォロー日（YYYY-MM-DD）', new Date().toISOString().slice(0,10));
+  if(!date) return;
+  const c=customers.find(x=>x.id===viewingId);
+  try { await upsert({...c, follow_up:date, updated_at:new Date().toISOString()}); await loadCustomers(); refresh(); openDetail(viewingId); }
+  catch(e){ alert('更新失敗: '+e.message); }
+}
+
+async function addNote(id){
+  const text=document.getElementById('new-note-text').value.trim();
+  if(!text) return;
+  const c=customers.find(x=>x.id===id);
+  const notes=[{date:new Date().toISOString(),text},...(c.notes||[])];
+  try { await upsert({...c, notes, updated_at:new Date().toISOString()}); await loadCustomers(); openDetail(id); }
+  catch(e){ alert('保存失敗: '+e.message); }
+}
+
+function editFromDetail(){ closeDetailModal(); openAddModal(viewingId); }
+
+async function deleteCustomer(){
+  if(!confirm('この顧客を削除しますか？この操作は取り消せません。')) return;
+  try { await dbDelete(viewingId); await loadCustomers(); closeDetailModal(); refresh(); }
+  catch(e){ alert('削除失敗: '+e.message); }
+}
+
+// ━━━━━━━ CSV ━━━━━━━
+function exportCSV(){
+  const h=['顧客番号','名前','ステージ','担当','渡航興味国','留学種別','CS回数','エルメ','デポジット','契約','流入元(大)','流入元(詳細)','流入元メモ','年齢','性別','職業','連絡先','希望期間','希望時期','予算','学校名','コース','週数','学費','渡航日','帰国日','次回フォロー','登録日'];
+  const rows=customers.map(c=>[c.num||'',c.name,c.stage,c.owner||'',c.destination||'',c.type||'',(c.cs_sessions||[]).filter(s=>s.date).length,c.elme?'済':'',c.deposit?'済':'',c.contract?'済':'',c.source||'',c.source_detail||'',c.source_memo||'',c.age||'',c.gender||'',c.job||'',c.contact||'',c.duration||'',c.timing||'',c.budget||'',c.school||'',c.course||'',c.weeks||'',c.tuition||'',c.departure||'',c.return_date||'',c.follow_up||'',(c.created_at||'').slice(0,10)]);
+  const csv=[h,...rows].map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8'}));
+  a.download=`crm_${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+}
+
+// ━━━━━━━ UTILS ━━━━━━━
+function parseDate(s){
+  if(!s) return null;
+  // "2024.10.16（水）" → 2024-10-16
+  const m1 = String(s).match(/(\d{4})[.\-\/](\d{1,2})[.\-\/](\d{1,2})/);
+  if(m1) return new Date(+m1[1], +m1[2]-1, +m1[3]);
+  const d = new Date(s);
+  return isNaN(d) ? null : d;
+}
+function fmtDate(s){ const d=parseDate(s); if(!d) return '―'; return `${d.getMonth()+1}/${d.getDate()}`; }
+function fmtDateFull(s){ const d=parseDate(s); if(!d) return '―'; return `${d.getFullYear()}/${d.getMonth()+1}/${d.getDate()}`; }
+function fmtDateTime(s){ const d=parseDate(s); if(!d) return ''; return `${d.getFullYear()}/${d.getMonth()+1}/${d.getDate()}`; }
+function followStyle(c){
+  if(!c.follow_up) return '';
+  const today=new Date(); today.setHours(0,0,0,0);
+  const soon=new Date(today); soon.setDate(soon.getDate()+3);
+  const fd=parseDate(c.follow_up);
+  if(!fd) return '';
+  if(fd<today) return 'color:var(--red);font-weight:700';
+  if(fd<=soon) return 'color:var(--orange);font-weight:600';
+  return '';
+}
+function refresh(){
+  const active=document.querySelector('.page.active');
+  if(!active) return;
+  if(active.id==='page-dashboard') renderDashboard();
+  if(active.id==='page-customers') renderTable();
+  if(active.id==='page-kanban') renderKanban();
+  if(active.id==='page-monthly') renderMonthly();
+}
+</script>
+</body>
+</html>
